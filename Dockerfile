@@ -20,4 +20,5 @@ USER app
 
 EXPOSE 8000
 ENTRYPOINT ["entrypoint.sh"]
-CMD ["fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+# Hosts like Render assign $PORT; default to 8000 elsewhere.
+CMD ["sh", "-c", "exec fastapi run app/main.py --host 0.0.0.0 --port ${PORT:-8000}"]

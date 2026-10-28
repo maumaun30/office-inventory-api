@@ -1,0 +1,60 @@
+# Render Blueprint for both services and a shared Postgres.
+# Deploy: Render dashboard > New > Blueprint > pick this repo. See README "Deploy to Render".
+databases:
+  - name: office-db
+    plan: free
+    databaseName: office
+    user: office
+
+services:
+  - type: web
+    name: office-users-api
+    runtime: docker
+    repo: https://github.com/maumaun30/office-users-api
+    branch: main
+    plan: free
+    healthCheckPath: /up
+    envVars:
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: office-db
+          property: connectionString
+      # Shared secret: registered as the inventory service's Sanctum token on boot.
+      - key: INVENTORY_SERVICE_TOKEN
+        generateValue: true
+      # First admin, created on boot if missing. Set in the dashboard.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: office-inventory-api
+    runtime: docker
+    repo: https://github.com/maumaun30/office-inventory-api
+    branch: main
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: office-db
+          property: connectionString
+      # Public URL of office-users-api, e.g. https://office-users-api.onrender.com
+      - key: USERS_API_URL
+        sync: false
+      - key: USERS_API_TOKEN
+        fromService:
+          type: web
+          name: office-users-api
+          envVarKey: INVENTORY_SERVICE_TOKEN
