@@ -4,12 +4,13 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
+from app.auth import admin_only
 from app.deps import DB, Users, get_or_404
 from app.models import Assignment, Item, ItemStatus
 from app.schemas import AssignmentCreate, AssignmentRead
 from app.users_client import UserNotFound
 
-router = APIRouter(prefix="/assignments", tags=["assignments"])
+router = APIRouter(prefix="/assignments", tags=["assignments"], dependencies=[admin_only])
 
 
 @router.get("", response_model=list[AssignmentRead])

@@ -50,19 +50,36 @@ Expected Laravel endpoints (standard API Resource shape):
 
 Creating an assignment looks up the user and snapshots name/email onto the record, so history and `/users/{id}/assignments` keep working if Laravel is down or the user changes. Unknown user returns 422; Laravel unreachable or unconfigured returns 503.
 
+### Authentication
+
+Every endpoint except `/health` requires `Authorization: Bearer <token>`, where the token is the caller's own Laravel Sanctum token. It is resolved by calling Laravel's `GET /api/user` with that token (the default `auth:sanctum` route), so that response must include the user's `id`, `name`, and the admin field below.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AUTH_ADMIN_FIELD` | `role` | Field on the `/api/user` payload that marks admins |
+| `AUTH_ADMIN_VALUES` | `admin` | Comma-separated values that count as admin |
+| `AUTH_CACHE_TTL` | `60` | Seconds to cache a successful token lookup (`0` disables) |
+
+The admin field may be a string (`"role": "admin"`), a boolean (`AUTH_ADMIN_FIELD=is_admin`), a list (`"roles": ["admin"]`), or Spatie-style role objects (`"roles": [{"name": "admin"}]`).
+
+Responses: no/invalid token returns 401; non-admin on an admin route returns 403; Laravel unreachable on an uncached token returns 503. A revoked token keeps working until its cache entry expires (up to `AUTH_CACHE_TTL` seconds). The cache is per process.
+
 ## Resources
 
-| Endpoint | Purpose |
-|---|---|
-| `/categories` | CRUD for item categories |
-| `/locations` | CRUD for rooms / floors / buildings |
-| `/items` | CRUD; filters `q`, `category_id`, `location_id`, `status`, `low_stock`, `skip`, `limit` |
-| `POST /items/{id}/adjust` | Add/remove stock (`{"delta": -2}`) |
-| `GET /items/summary` | Totals, value, assigned units, low-stock count |
-| `/assignments` | Check items out to users (`{"item_id": 1, "user_id": 12}`); filters `item_id`, `user_id`, `assignee`, `active` |
-| `POST /assignments/{id}/return` | Check an item back in |
-| `GET /users`, `GET /users/{id}` | Proxied from Laravel |
-| `GET /users/{id}/assignments` | Items a user holds (local data); filter `active` |
+Access: **any** = any authenticated user, **admin** = admin only.
+
+| Endpoint | Access | Purpose |
+|---|---|---|
+| `GET /categories`, `GET /locations`, `GET /items[...]` | any | Read catalog, including `/items/summary` |
+| `POST`/`PATCH`/`DELETE` on `/categories`, `/locations`, `/items` | admin | CRUD for categories, locations (rooms / floors / buildings), items |
+| `GET /items` filters | | `q`, `category_id`, `location_id`, `status`, `low_stock`, `skip`, `limit` |
+| `POST /items/{id}/adjust` | admin | Add/remove stock (`{"delta": -2}`) |
+| `/assignments` | admin | Check items out to users (`{"item_id": 1, "user_id": 12}`); filters `item_id`, `user_id`, `assignee`, `active` |
+| `POST /assignments/{id}/return` | admin | Check an item back in |
+| `GET /users`, `GET /users/{id}` | admin | Proxied from Laravel |
+| `GET /users/{id}/assignments` | admin | Items a user holds (local data); filter `active` |
+| `GET /me` | any | The caller, with `is_admin` |
+| `GET /me/assignments` | any | Items the caller holds; filter `active` |
 
 Rules: an item can't be assigned beyond its available quantity or while `in_repair`/`retired`; its quantity can't drop below what's assigned; items with open assignments can't be deleted. Low stock = available ≤ `reorder_level`.
 

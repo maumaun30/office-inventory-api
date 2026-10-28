@@ -21,6 +21,10 @@ class UsersServiceError(Exception):
     """Laravel API unreachable, misconfigured, or returned something unexpected."""
 
 
+class InvalidToken(Exception):
+    """Laravel rejected a caller's bearer token."""
+
+
 class UsersClient:
     def __init__(
         self,
@@ -36,19 +40,40 @@ class UsersClient:
             base_url=base_url.rstrip("/"), headers=headers, timeout=timeout, transport=transport
         )
 
-    def _get(self, path: str, **params) -> dict:
+    def _send(self, path: str, headers: dict | None = None, **params) -> httpx.Response:
         try:
-            resp = self._http.get(path, params=params or None)
+            return self._http.get(path, params=params or None, headers=headers)
         except httpx.HTTPError as exc:
             raise UsersServiceError(f"Users API unreachable: {exc}") from exc
-        if resp.status_code == 404:
-            raise UserNotFound(path)
+
+    @staticmethod
+    def _json(resp: httpx.Response) -> dict:
         if resp.is_error:
             raise UsersServiceError(f"Users API returned {resp.status_code}")
         try:
             return resp.json()
         except ValueError as exc:
             raise UsersServiceError("Users API returned invalid JSON") from exc
+
+    def _get(self, path: str, **params) -> dict:
+        resp = self._send(path, **params)
+        if resp.status_code == 404:
+            raise UserNotFound(path)
+        return self._json(resp)
+
+    def get_token_owner(self, token: str) -> dict:
+        """Resolve a caller's Sanctum token via Laravel's `GET /api/user`.
+
+        Returns the raw user payload so role fields beyond ExternalUser survive.
+        """
+        resp = self._send("/api/user", headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code in (401, 403):
+            raise InvalidToken()
+        body = self._json(resp)
+        user = body.get("data", body) if isinstance(body, dict) else None
+        if not isinstance(user, dict):
+            raise UsersServiceError("Unexpected user payload from Users API")
+        return user
 
     def get_user(self, user_id: int) -> ExternalUser:
         body = self._get(f"/api/users/{user_id}")

@@ -2,13 +2,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.auth import admin_only
 from app.deps import DB, Users
 from app.models import Assignment
 from app.schemas import AssignmentRead
 from app.users_client import ExternalUser, UserNotFound
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["users"], dependencies=[admin_only])
 
 
 @router.get("", response_model=list[ExternalUser])
@@ -32,9 +34,13 @@ def user_assignments(
     active: Annotated[bool | None, Query(description="true = not yet returned")] = None,
 ):
     """Assignments held by a user. Reads local records only; no Laravel call."""
+    return assignments_for_user(db, user_id, active)
+
+
+def assignments_for_user(db: Session, user_id: int, active: bool | None) -> list[Assignment]:
     stmt = select(Assignment).where(Assignment.user_id == user_id)
     if active is True:
         stmt = stmt.where(Assignment.returned_at.is_(None))
     elif active is False:
         stmt = stmt.where(Assignment.returned_at.is_not(None))
-    return db.scalars(stmt.order_by(Assignment.assigned_at.desc())).all()
+    return list(db.scalars(stmt.order_by(Assignment.assigned_at.desc())))

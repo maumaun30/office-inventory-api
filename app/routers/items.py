@@ -4,11 +4,12 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.auth import admin_only, authenticated
 from app.deps import DB, commit_or_409, get_or_404
 from app.models import Category, Item, ItemStatus, Location
 from app.schemas import InventorySummary, ItemCreate, ItemRead, ItemUpdate, StockAdjust
 
-router = APIRouter(prefix="/items", tags=["items"])
+router = APIRouter(prefix="/items", tags=["items"], dependencies=[authenticated])
 
 
 def _validate_refs(db: Session, data: dict) -> None:
@@ -89,7 +90,9 @@ def inventory_summary(db: DB):
     )
 
 
-@router.post("", response_model=ItemRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=ItemRead, status_code=status.HTTP_201_CREATED, dependencies=[admin_only]
+)
 def create_item(payload: ItemCreate, db: DB):
     data = payload.model_dump()
     _validate_refs(db, data)
@@ -103,7 +106,7 @@ def get_item(item_id: int, db: DB):
     return get_or_404(db, Item, item_id)
 
 
-@router.patch("/{item_id}", response_model=ItemRead)
+@router.patch("/{item_id}", response_model=ItemRead, dependencies=[admin_only])
 def update_item(item_id: int, payload: ItemUpdate, db: DB):
     item = get_or_404(db, Item, item_id)
     data = payload.model_dump(exclude_unset=True)
@@ -115,7 +118,7 @@ def update_item(item_id: int, payload: ItemUpdate, db: DB):
     return _save(db, item)
 
 
-@router.post("/{item_id}/adjust", response_model=ItemRead)
+@router.post("/{item_id}/adjust", response_model=ItemRead, dependencies=[admin_only])
 def adjust_stock(item_id: int, payload: StockAdjust, db: DB):
     item = get_or_404(db, Item, item_id)
     new_quantity = item.quantity + payload.delta
@@ -126,7 +129,7 @@ def adjust_stock(item_id: int, payload: StockAdjust, db: DB):
     return _save(db, item)
 
 
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[admin_only])
 def delete_item(item_id: int, db: DB):
     item = get_or_404(db, Item, item_id)
     if item.assigned_quantity:

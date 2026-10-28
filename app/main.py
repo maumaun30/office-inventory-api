@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.routers import assignments, categories, items, locations, users
+from app.routers import assignments, categories, items, locations, me, users
 from app.users_client import UsersServiceError
 
 # Schema is managed by Alembic: run `alembic upgrade head` before starting.
@@ -16,6 +16,7 @@ app.include_router(locations.router)
 app.include_router(items.router)
 app.include_router(assignments.router)
 app.include_router(users.router)
+app.include_router(me.router)
 
 
 @app.exception_handler(UsersServiceError)

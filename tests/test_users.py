@@ -8,7 +8,8 @@ def test_list_and_get_users(client, laravel):
     assert [u["name"] for u in client.get("/users").json()] == ["Ana", "Ben", "Cy"]
     assert client.get("/users/2").json()["email"] == "ben@example.com"
     assert client.get("/users/99").status_code == 404
-    assert laravel.requests[0].headers["Authorization"] == "Bearer test-token"
+    proxied = [r for r in laravel.requests if r.url.path != "/api/user"]
+    assert proxied[0].headers["Authorization"] == "Bearer test-token"
 
 
 def test_assign_unknown_user_rejected(client):
@@ -28,7 +29,7 @@ def test_laravel_down_returns_503(client, laravel):
 def test_local_checks_skip_laravel_call(client, laravel):
     item = make_item(client, status="retired")
     assert client.post("/assignments", json={"item_id": item["id"], "user_id": 1}).status_code == 409
-    assert laravel.requests == []
+    assert [r.url.path for r in laravel.requests] == ["/api/user"]  # auth only, then cached
 
 
 def test_user_assignments_survive_laravel_outage(client, laravel):

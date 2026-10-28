@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.auth import token_cache
 from app.database import Base, get_db
 from app.deps import users_client
 from app.main import app
@@ -17,6 +18,14 @@ FAKE_USERS = {
     2: {"id": 2, "name": "Ben", "email": "ben@example.com"},
     3: {"id": 3, "name": "Cy", "email": None},
 }
+
+# Caller tokens -> user payload from Laravel's GET /api/user.
+TOKENS = {
+    "admin-token": {**FAKE_USERS[1], "role": "admin"},
+    "staff-token": {**FAKE_USERS[2], "role": "staff"},
+}
+ADMIN = {"Authorization": "Bearer admin-token"}
+STAFF = {"Authorization": "Bearer staff-token"}
 
 
 class FakeLaravel:
@@ -30,6 +39,12 @@ class FakeLaravel:
         self.requests.append(request)
         if self.down:
             raise httpx.ConnectError("connection refused", request=request)
+        if request.url.path == "/api/user":
+            token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+            user = TOKENS.get(token)
+            if user is None:
+                return httpx.Response(401, json={"message": "Unauthenticated."})
+            return httpx.Response(200, json=user)
         if request.url.path == "/api/users":
             return httpx.Response(200, json={"data": list(FAKE_USERS.values()), "meta": {}})
         if m := re.fullmatch(r"/api/users/(\d+)", request.url.path):
@@ -66,6 +81,8 @@ def client(laravel):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[users_client] = lambda: fake_users
-    with TestClient(app) as c:
+    token_cache.clear()
+    with TestClient(app, headers=ADMIN) as c:
         yield c
     app.dependency_overrides.clear()
+    token_cache.clear()
