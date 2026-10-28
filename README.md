@@ -78,7 +78,7 @@ Creating an assignment looks up the user and snapshots name/email onto the recor
 
 ### Authentication
 
-Every endpoint except `/health` requires `Authorization: Bearer <token>`, where the token is the caller's own Laravel Sanctum token. It is resolved by calling Laravel's `GET /api/user` with that token (the default `auth:sanctum` route), so that response must include the user's `id`, `name`, and the admin field below.
+Every endpoint except `/health` and `/health/ready` requires `Authorization: Bearer <token>`, where the token is the caller's own Laravel Sanctum token. It is resolved by calling Laravel's `GET /api/user` with that token (the default `auth:sanctum` route), so that response must include the user's `id`, `name`, and the admin field below.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -101,14 +101,29 @@ Access: **any** = any authenticated user, **admin** = admin only.
 | `GET /items` filters | | `q`, `category_id`, `location_id`, `status`, `low_stock`, `skip`, `limit` |
 | `POST /items/{id}/adjust` | admin | Add/remove stock (`{"delta": -2, "reason": "broken"}`) |
 | `GET /items/{id}/movements` | admin | Quantity history: `initial`, `adjust` (with reason), `edit` (PATCH), each with acting `user_id` |
+| `GET /items/export` | any | All items as CSV (category/location by name) |
+| `POST /items/import` | admin | Create/update items from a CSV upload (`file`); `?dry_run=true` to preview. See below |
 | `/assignments` | admin | Check items out to users (`{"item_id": 1, "user_id": 12}`); filters `item_id`, `user_id`, `assignee`, `active` |
 | `POST /assignments/{id}/return` | admin | Check an item back in |
-| `GET /users`, `GET /users/{id}` | admin | Proxied from Laravel |
+| `GET /users`, `GET /users/{id}` | admin | Proxied from Laravel. `/users` takes `page`, `per_page` (max 100) and returns paging in `X-Page`, `X-Per-Page`, `X-Total-Count`, `X-Last-Page`, `Link` headers |
 | `GET /users/{id}/assignments` | admin | Items a user holds (local data); filter `active` |
 | `GET /me` | any | The caller, with `is_admin` |
 | `GET /me/assignments` | any | Items the caller holds; filter `active` |
+| `GET /health` | public | Liveness, no dependency checks |
+| `GET /health/ready` | public | Readiness: `{"status", "checks": {"database", "users_api"}}`, 503 if any fails |
 
 Rules: an item can't be assigned beyond its available quantity or while `in_repair`/`retired`; its quantity can't drop below what's assigned; items with open assignments can't be deleted. Low stock = available ≤ `reorder_level`.
+
+### CSV import
+
+Columns match `GET /items/export`, so an export can be edited and re-imported. Only `name` is required; `id`, `sku`, `serial_number`, `description`, `quantity`, `reorder_level`, `unit_cost`, `status`, `category`, `location` are read, others ignored.
+
+- Each row updates the item with that `id`, else the item with that `sku`, else creates a new item.
+- Blank cells leave a field unchanged on update (so CSV import can't clear a field). New items take API defaults (`quantity` 1, `status` active).
+- Unknown categories/locations are created by name.
+- All-or-nothing: any invalid row returns 422 with `detail.errors: [{row, errors}]` and nothing is saved.
+- Limits: 2 MB, 5000 rows, UTF-8 (Excel's BOM is fine). Quantity changes are logged as stock movements with reason `csv import`.
+- Export prefixes text cells starting with `= + - @` with `'` so spreadsheets don't run them as formulas; import strips that prefix.
 
 Audit: every quantity change writes a stock movement; assignments record `assigned_by_user_id` and `returned_by_user_id` (Laravel user IDs of the acting admin).
 
