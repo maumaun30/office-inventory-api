@@ -1,4 +1,7 @@
+import os
+
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.routers import (
@@ -21,6 +24,26 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+
+# Browser clients (the web UI) on other origins. Bearer tokens, no cookies.
+cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX") or None
+if cors_origins or cors_origin_regex:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_origin_regex=cors_origin_regex,
+        allow_methods=["*"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=[
+            "X-Page",
+            "X-Per-Page",
+            "X-Total-Count",
+            "X-Last-Page",
+            "Link",
+            "Content-Disposition",
+        ],
+    )
 
 app.include_router(categories.router)
 app.include_router(locations.router)
