@@ -1,8 +1,11 @@
 # Render Blueprint for both services and a shared Postgres.
 # Deploy: Render dashboard > New > Blueprint > pick this repo. See README "Deploy to Render".
+# All three must share a region: the services reach the database over Render's private network.
+# Regions: oregon (Render's default), ohio, virginia, frankfurt, singapore.
 databases:
   - name: office-db
     plan: free
+    region: singapore
     databaseName: office
     user: office
 
@@ -13,6 +16,7 @@ services:
     repo: https://github.com/maumaun30/office-users-api
     branch: main
     plan: free
+    region: singapore
     healthCheckPath: /up
     envVars:
       - key: APP_KEY
@@ -47,6 +51,7 @@ services:
     repo: https://github.com/maumaun30/office-inventory-api
     branch: main
     plan: free
+    region: singapore
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL

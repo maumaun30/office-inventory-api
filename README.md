@@ -42,8 +42,10 @@ curl -s -XPOST localhost:8000/api/login -H 'Accept: application/json' -d email=a
 
 `render.yaml` is a Blueprint for both APIs (Docker, free plan) and one shared Postgres (the two apps' tables don't overlap).
 
+Everything deploys to `region: singapore`; change all three `region:` lines together to move it (a region can't be changed after a service is created, so recreate the services).
+
 1. Render dashboard, **New > Blueprint**, pick this repo.
-2. When prompted, set `ADMIN_EMAIL` / `ADMIN_PASSWORD` (first admin, created on boot) and `USERS_API_URL` to `https://office-users-api.onrender.com`.
+2. When prompted, set `ADMIN_EMAIL` / `ADMIN_PASSWORD` (first admin, created on boot), `USERS_API_URL` to `https://office-users-api.onrender.com`, and the web UI origin(s) in `CORS_ORIGINS` / `CORS_ALLOWED_ORIGINS` (e.g. `https://office-inventory-ui.vercel.app`).
 3. After the first deploy, check the users API's real URL in the dashboard. If Render added a suffix, update `USERS_API_URL` on the inventory API.
 4. Verify: `GET https://<inventory>.onrender.com/health/ready` returns `"users_api": "ok"`.
 
