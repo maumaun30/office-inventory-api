@@ -14,6 +14,14 @@ class ExternalUser(BaseModel):
     email: str | None = None
 
 
+class UserPage(BaseModel):
+    users: list[ExternalUser]
+    page: int
+    per_page: int
+    total: int | None = None  # None if Laravel didn't send pagination meta
+    last_page: int | None = None
+
+
 class UserNotFound(Exception):
     pass
 
@@ -83,12 +91,29 @@ class UsersClient:
         except (ValidationError, AttributeError) as exc:
             raise UsersServiceError("Unexpected user payload from Users API") from exc
 
-    def list_users(self, page: int = 1) -> list[ExternalUser]:
-        body = self._get("/api/users", page=page)
+    def list_users(self, page: int = 1, per_page: int | None = None) -> UserPage:
+        params = {"page": page}
+        if per_page is not None:
+            params["per_page"] = per_page
+        body = self._get("/api/users", **params)
         try:
-            return [ExternalUser.model_validate(u) for u in body.get("data", [])]
-        except (ValidationError, AttributeError) as exc:
+            users = [ExternalUser.model_validate(u) for u in body.get("data", [])]
+            meta = body.get("meta") or {}
+            return UserPage(
+                users=users,
+                page=int(meta.get("current_page", page)),
+                per_page=int(meta.get("per_page", len(users))),
+                total=int(meta["total"]) if "total" in meta else None,
+                last_page=int(meta["last_page"]) if "last_page" in meta else None,
+            )
+        except (ValidationError, AttributeError, TypeError, ValueError) as exc:
             raise UsersServiceError("Unexpected users payload from Users API") from exc
+
+    def ping(self) -> None:
+        """Check Laravel's health route (`GET /up`). Raises UsersServiceError if unhealthy."""
+        resp = self._send("/up")
+        if resp.status_code != 200:
+            raise UsersServiceError(f"Users API health check returned {resp.status_code}")
 
 
 @lru_cache
