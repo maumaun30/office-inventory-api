@@ -13,14 +13,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["meta"])
 
+# Uptime monitors (UptimeRobot etc.) often probe with HEAD; FastAPI only adds GET by default.
+PROBE_METHODS = ["GET", "HEAD"]
 
-@router.get("")
+
+@router.api_route("", methods=PROBE_METHODS)
 def health():
     """Liveness: the process is up. No dependencies checked."""
     return {"status": "ok"}
 
 
-@router.get("/ready")
+@router.api_route("/ready", methods=PROBE_METHODS)
 def ready(db: DB, users: Annotated[UsersClient | None, Depends(optional_users_client)]):
     """Readiness: database and Laravel users API are reachable; 503 if not.
 

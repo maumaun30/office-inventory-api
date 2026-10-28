@@ -11,6 +11,13 @@ def test_liveness_public(client):
     assert client.get("/health", headers=NO_AUTH).json() == {"status": "ok"}
 
 
+def test_head_probes(client, laravel):
+    assert client.head("/health", headers=NO_AUTH).status_code == 200
+    assert client.head("/health/ready", headers=NO_AUTH).status_code == 200
+    laravel.down = True
+    assert client.head("/health/ready", headers=NO_AUTH).status_code == 503
+
+
 def test_ready_ok(client, laravel):
     resp = client.get("/health/ready", headers=NO_AUTH)
     assert resp.status_code == 200
