@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import ItemStatus
+from app.models import ItemStatus, MovementKind
 
 
 class ORMModel(BaseModel):
@@ -119,6 +119,19 @@ class AssignmentRead(ORMModel):
     notes: str | None
     assigned_at: datetime
     returned_at: datetime | None
+    assigned_by_user_id: int | None
+    returned_by_user_id: int | None
+
+
+class StockMovementRead(ORMModel):
+    id: int
+    item_id: int
+    kind: MovementKind
+    delta: int
+    quantity_after: int
+    reason: str | None
+    user_id: int | None
+    created_at: datetime
 
 
 # --- Stats ---

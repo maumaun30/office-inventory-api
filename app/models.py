@@ -17,6 +17,12 @@ class ItemStatus(str, enum.Enum):
     retired = "retired"
 
 
+class MovementKind(str, enum.Enum):
+    initial = "initial"  # stock entered when the item was created
+    adjust = "adjust"  # POST /items/{id}/adjust
+    edit = "edit"  # quantity changed via PATCH /items/{id}
+
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -57,8 +63,26 @@ class Assignment(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Laravel user IDs of the admins who performed each action (null on legacy rows).
+    assigned_by_user_id: Mapped[int | None] = mapped_column(Integer)
+    returned_by_user_id: Mapped[int | None] = mapped_column(Integer)
 
     item: Mapped["Item"] = relationship(back_populates="assignments")
+
+
+class StockMovement(Base):
+    """Append-only log of changes to an item's quantity."""
+
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[MovementKind] = mapped_column(Enum(MovementKind))
+    delta: Mapped[int] = mapped_column(Integer)
+    quantity_after: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Item(Base):
@@ -84,6 +108,9 @@ class Item(Base):
     location: Mapped[Location | None] = relationship(back_populates="items")
     assignments: Mapped[list[Assignment]] = relationship(
         back_populates="item", cascade="all, delete-orphan"
+    )
+    movements: Mapped[list[StockMovement]] = relationship(
+        cascade="all, delete-orphan", order_by=StockMovement.id
     )
 
     # Units currently checked out (open assignments).

@@ -4,13 +4,23 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.auth import admin_only
-from app.deps import DB, Users, get_or_404
+from app.auth import Admin, admin_only
+from app.deps import DB, Users, get_for_update, get_or_404
 from app.models import Assignment, Item, ItemStatus
 from app.schemas import AssignmentCreate, AssignmentRead
 from app.users_client import UserNotFound
 
 router = APIRouter(prefix="/assignments", tags=["assignments"], dependencies=[admin_only])
+
+
+def _check_assignable(item: Item, quantity: int) -> None:
+    if item.status != ItemStatus.active:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Item is {item.status.value}, cannot assign")
+    if quantity > item.available_quantity:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Only {item.available_quantity} unit(s) available",
+        )
 
 
 @router.get("", response_model=list[AssignmentRead])
@@ -42,23 +52,24 @@ def list_assignments(
 
 
 @router.post("", response_model=AssignmentRead, status_code=status.HTTP_201_CREATED)
-def create_assignment(payload: AssignmentCreate, db: DB, users: Users):
-    item = get_or_404(db, Item, payload.item_id)
-    if item.status != ItemStatus.active:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"Item is {item.status.value}, cannot assign")
-    if payload.quantity > item.available_quantity:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"Only {item.available_quantity} unit(s) available",
-        )
+def create_assignment(payload: AssignmentCreate, db: DB, users: Users, admin: Admin):
+    # Unlocked pre-check fails fast without calling Laravel...
+    _check_assignable(get_or_404(db, Item, payload.item_id), payload.quantity)
     try:
         user = users.get_user(payload.user_id)
     except UserNotFound:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, f"User {payload.user_id} not found"
         ) from None
+    # ...then lock and re-check, so concurrent requests can't over-assign. The
+    # Laravel call happens before the lock to avoid holding it during network I/O.
+    db.rollback()  # end the pre-check's transaction; the locked section starts fresh
+    _check_assignable(get_for_update(db, Item, payload.item_id), payload.quantity)
     assignment = Assignment(
-        **payload.model_dump(), assignee_name=user.name, assignee_email=user.email
+        **payload.model_dump(),
+        assignee_name=user.name,
+        assignee_email=user.email,
+        assigned_by_user_id=admin.id,
     )
     db.add(assignment)
     db.commit()
@@ -71,10 +82,11 @@ def get_assignment(assignment_id: int, db: DB):
 
 
 @router.post("/{assignment_id}/return", response_model=AssignmentRead)
-def return_assignment(assignment_id: int, db: DB):
-    assignment = get_or_404(db, Assignment, assignment_id)
+def return_assignment(assignment_id: int, db: DB, admin: Admin):
+    assignment = get_for_update(db, Assignment, assignment_id)
     if assignment.returned_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Assignment already returned")
     assignment.returned_at = datetime.now(timezone.utc)
+    assignment.returned_by_user_id = admin.id
     db.commit()
     return assignment

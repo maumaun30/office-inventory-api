@@ -1,6 +1,7 @@
 from typing import Annotated, TypeVar
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,21 @@ def get_or_404(db: Session, model: type[M], obj_id: int) -> M:
     if obj is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{model.__name__} {obj_id} not found")
     return obj
+
+
+def get_for_update(db: Session, model: type[M], obj_id: int) -> M:
+    """Row-lock `obj_id` for the rest of the transaction, then load it.
+
+    Lock and load are separate statements on purpose: under READ COMMITTED a
+    single SELECT ... FOR UPDATE that waited on another transaction still
+    evaluates subqueries (like Item.assigned_quantity) against its old
+    snapshot. A fresh SELECT after the lock sees the other commit.
+    SQLite ignores FOR UPDATE; use Postgres for real concurrency.
+    """
+    pk = model.__mapper__.primary_key[0]
+    if db.scalar(select(pk).where(pk == obj_id).with_for_update()) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{model.__name__} {obj_id} not found")
+    return db.get(model, obj_id, populate_existing=True)
 
 
 def commit_or_409(db: Session) -> None:

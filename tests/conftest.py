@@ -1,3 +1,4 @@
+import os
 import re
 
 import httpx
@@ -12,6 +13,20 @@ from app.database import Base, get_db
 from app.deps import users_client
 from app.main import app
 from app.users_client import UsersClient
+
+# Run against Postgres with e.g.
+#   TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/inventory_test pytest
+# The database is wiped by each test. Defaults to in-memory SQLite.
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+
+
+def make_engine():
+    if TEST_DATABASE_URL:
+        return create_engine(TEST_DATABASE_URL)
+    return create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+
 
 FAKE_USERS = {
     1: {"id": 1, "name": "Ana", "email": "ana@example.com"},
@@ -61,10 +76,16 @@ def laravel():
 
 
 @pytest.fixture
-def client(laravel):
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def engine():
+    engine = make_engine()
+    Base.metadata.drop_all(bind=engine)
+    yield engine
+    Base.metadata.drop_all(bind=engine)
+    engine.dispose()
+
+
+@pytest.fixture
+def client(laravel, engine):
     TestingSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(bind=engine)
 
