@@ -55,6 +55,8 @@ Free plan caveats: services sleep after 15 minutes idle (first request then take
 
 The demo accounts (`--seed`) are not created on Render.
 
+**Uptime monitoring** (UptimeRobot etc.): monitor `https://<inventory>.onrender.com/health/ready`. It answers GET or HEAD, is public, and also checks the database and users API, so one monitor covers the whole stack. Monitors call the API server-side, so no CORS setting is needed. Note that pinging every few minutes keeps free services awake, and two always-on services use more than Render's 750 free instance hours a month.
+
 ### Migrations
 
 Schema is managed by Alembic (`migrations/`); the app does not create tables on startup.
@@ -137,8 +139,8 @@ Access: **any** = any authenticated user, **admin** = admin only.
 | `GET /users/{id}/assignments` | admin | Items a user holds (local data); filter `active` |
 | `GET /me` | any | The caller, with `is_admin` |
 | `GET /me/assignments` | any | Items the caller holds; filter `active` |
-| `GET /health` | public | Liveness, no dependency checks |
-| `GET /health/ready` | public | Readiness: `{"status", "checks": {"database", "users_api"}}`, 503 if any fails |
+| `GET`/`HEAD /health` | public | Liveness, no dependency checks |
+| `GET`/`HEAD /health/ready` | public | Readiness: `{"status", "checks": {"database", "users_api"}}`, 503 if any fails |
 
 Rules: an item can't be assigned beyond its available quantity or while `in_repair`/`retired`; its quantity can't drop below what's assigned; items with open assignments can't be deleted. Low stock = available ≤ `reorder_level`.
 
