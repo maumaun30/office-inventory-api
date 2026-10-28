@@ -86,6 +86,8 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/inventory
       USERS_API_URL: http://users-api
       USERS_API_TOKEN_FILE: /secrets/users_api_token
+      # Local web UI (office-inventory-ui `npm run dev`).
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     volumes:
       - secrets:/secrets:ro
     depends_on:

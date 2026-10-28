@@ -91,6 +91,17 @@ Expected Laravel endpoints (standard API Resource shape):
 
 Creating an assignment looks up the user and snapshots name/email onto the record, so history and `/users/{id}/assignments` keep working if Laravel is down or the user changes. Unknown user returns 422; Laravel unreachable or unconfigured returns 503.
 
+### CORS
+
+Off unless configured. For a browser UI on another origin:
+
+| Variable | Purpose |
+|---|---|
+| `CORS_ORIGINS` | Comma-separated allowed origins, e.g. `https://office-inventory-ui.vercel.app,http://localhost:5173` |
+| `CORS_ORIGIN_REGEX` | Optional pattern, e.g. `https://office-inventory-ui-.*\.vercel\.app` for Vercel previews |
+
+Paging headers (`X-Total-Count`, `Link`, ...) and `Content-Disposition` are exposed to scripts. The users API has matching `CORS_ALLOWED_ORIGINS` / `CORS_ALLOWED_ORIGIN_PATTERN`.
+
 ### Authentication
 
 Every endpoint except `/health` and `/health/ready` requires `Authorization: Bearer <token>`, where the token is the caller's own Laravel Sanctum token. It is resolved by calling Laravel's `GET /api/user` with that token (the default `auth:sanctum` route), so that response must include the user's `id`, `name`, and the admin field below.
