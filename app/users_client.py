@@ -2,6 +2,7 @@
 
 import os
 from functools import lru_cache
+from pathlib import Path
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -97,6 +98,16 @@ def get_users_client() -> UsersClient:
         raise UsersServiceError("USERS_API_URL is not configured")
     return UsersClient(
         base_url,
-        token=os.getenv("USERS_API_TOKEN"),
+        token=_service_token(),
         timeout=float(os.getenv("USERS_API_TIMEOUT", "5")),
     )
+
+
+def _service_token() -> str | None:
+    """USERS_API_TOKEN, or the contents of USERS_API_TOKEN_FILE (e.g. a Docker secret)."""
+    if path := os.getenv("USERS_API_TOKEN_FILE"):
+        try:
+            return Path(path).read_text().strip() or None
+        except OSError as exc:
+            raise UsersServiceError(f"Cannot read USERS_API_TOKEN_FILE: {exc}") from exc
+    return os.getenv("USERS_API_TOKEN")

@@ -1,3 +1,6 @@
+import pytest
+
+
 def make_item(client, **overrides):
     payload = {"name": "Laptop", "quantity": 3}
     payload.update(overrides)
@@ -43,3 +46,24 @@ def test_user_assignments_survive_laravel_outage(client, laravel):
     assert [x["assignee_name"] for x in held] == ["Ana"]
     assert client.get("/users/1/assignments", params={"active": True}).json() == []
     assert [x["user_id"] for x in client.get("/assignments", params={"user_id": 2}).json()] == [2]
+
+
+def test_service_token_from_file(tmp_path, monkeypatch):
+    from app import users_client as uc
+
+    token_file = tmp_path / "token"
+    token_file.write_text("file-token\n")
+    monkeypatch.setenv("USERS_API_URL", "http://laravel.test")
+    monkeypatch.setenv("USERS_API_TOKEN", "env-token")
+    monkeypatch.setenv("USERS_API_TOKEN_FILE", str(token_file))
+    uc.get_users_client.cache_clear()
+    try:
+        client = uc.get_users_client()
+        assert client._http.headers["Authorization"] == "Bearer file-token"
+
+        uc.get_users_client.cache_clear()
+        monkeypatch.setenv("USERS_API_TOKEN_FILE", str(tmp_path / "missing"))
+        with pytest.raises(uc.UsersServiceError):
+            uc.get_users_client()
+    finally:
+        uc.get_users_client.cache_clear()

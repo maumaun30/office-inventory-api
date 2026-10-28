@@ -15,6 +15,29 @@ Database defaults to SQLite (`./inventory.db`). Override with `DATABASE_URL`, e.
 
 Use Postgres anywhere more than one request can write at once. Stock and assignment changes take a row lock on the item (`SELECT ... FOR UPDATE`) so concurrent requests can't over-assign; SQLite ignores row locks.
 
+### Docker
+
+Runs Postgres, the [Laravel users API](../office-users-api) and this API together. Needs `office-users-api` checked out next to this repo.
+
+```bash
+echo "USERS_APP_KEY=base64:$(openssl rand -base64 32)" > .env   # once
+docker compose up -d --build --wait
+```
+
+| Service | URL |
+|---|---|
+| Inventory API | http://localhost:8001/docs |
+| Users API | http://localhost:8000 |
+| Postgres | `localhost:5432`, user/password `postgres` (databases `inventory`, `users`) |
+
+On first start `users-init` seeds the demo accounts (`admin@example.com` / `staff@example.com`, password `password`) and writes the inventory API's service token to a shared volume; later starts reuse both. Both APIs run migrations on startup (`RUN_MIGRATIONS=0` disables that). Get a token to try things:
+
+```bash
+curl -s -XPOST localhost:8000/api/login -H 'Accept: application/json' -d email=admin@example.com -d password=password
+```
+
+`docker compose down -v` wipes the databases and the token.
+
 ### Migrations
 
 Schema is managed by Alembic (`migrations/`); the app does not create tables on startup.
@@ -43,6 +66,7 @@ Users live in a separate Laravel API. Configure via env (see `.env.example`):
 |---|---|
 | `USERS_API_URL` | Laravel base URL, e.g. `https://hr.example.com` |
 | `USERS_API_TOKEN` | Sanctum token, sent as `Authorization: Bearer ...` |
+| `USERS_API_TOKEN_FILE` | Alternative to `USERS_API_TOKEN`: path to a file holding the token (takes precedence) |
 | `USERS_API_TIMEOUT` | Seconds, default `5` |
 
 Expected Laravel endpoints (standard API Resource shape):

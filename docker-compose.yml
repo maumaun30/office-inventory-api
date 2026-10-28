@@ -1,0 +1,106 @@
+# Local stack: Postgres + Laravel users API + inventory API.
+# Expects office-users-api checked out next to this repo. See README "Docker".
+
+x-users-env: &users-env
+  APP_ENV: local
+  APP_DEBUG: "true"
+  APP_KEY: ${USERS_APP_KEY:?Set USERS_APP_KEY in .env (see README)}
+  APP_URL: http://localhost:8000
+  LOG_CHANNEL: stderr
+  DB_CONNECTION: pgsql
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_DATABASE: users
+  DB_USERNAME: postgres
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  CACHE_STORE: database
+  SESSION_DRIVER: database
+  QUEUE_CONNECTION: sync
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: inventory
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory && psql -U postgres -lqt | cut -d '|' -f1 | grep -qw users"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  users-api:
+    build: ../office-users-api
+    environment: *users-env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:80"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://localhost/up') === false ? 1 : 0);"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  # One-off: seed demo accounts and write the inventory API's service token.
+  users-init:
+    build: ../office-users-api
+    environment:
+      <<: *users-env
+      RUN_MIGRATIONS: "0"
+    command:
+      - php
+      - artisan
+      - service:bootstrap
+      - inventory-service@example.com
+      - --token-file=/secrets/users_api_token
+      - --seed
+    volumes:
+      - secrets:/secrets
+    depends_on:
+      users-api:
+        condition: service_healthy
+    restart: "no"
+
+  users-scheduler:
+    build: ../office-users-api
+    environment:
+      <<: *users-env
+      RUN_MIGRATIONS: "0"
+    user: www-data
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      users-api:
+        condition: service_healthy
+
+  inventory-api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/inventory
+      USERS_API_URL: http://users-api
+      USERS_API_TOKEN_FILE: /secrets/users_api_token
+    volumes:
+      - secrets:/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      users-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pgdata:
+  secrets:
