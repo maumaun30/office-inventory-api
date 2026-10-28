@@ -1,24 +1,14 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.database import Base, engine
 from app.routers import assignments, categories, items, locations, users
 from app.users_client import UsersServiceError
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
+# Schema is managed by Alembic: run `alembic upgrade head` before starting.
 app = FastAPI(
     title="Office Inventory API",
     description="Track office equipment and supplies: items, categories, locations, and who has what.",
     version="1.0.0",
-    lifespan=lifespan,
 )
 
 app.include_router(categories.router)
