@@ -5,8 +5,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import Base, get_db
+from app.users_client import UsersClient, UsersServiceError, get_users_client
 
 DB = Annotated[Session, Depends(get_db)]
+
+
+def users_client() -> UsersClient:
+    try:
+        return get_users_client()
+    except UsersServiceError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+
+Users = Annotated[UsersClient, Depends(users_client)]
 
 M = TypeVar("M", bound=Base)
 

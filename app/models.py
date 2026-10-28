@@ -40,12 +40,17 @@ class Location(Base):
 
 
 class Assignment(Base):
-    """An item (or some quantity of it) checked out to a person."""
+    """An item (or some quantity of it) checked out to a user.
+
+    `user_id` references a user in the external Laravel API; name and email
+    are snapshotted at assignment time so history survives user changes.
+    """
 
     __tablename__ = "assignments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     assignee_name: Mapped[str] = mapped_column(String(100))
     assignee_email: Mapped[str | None] = mapped_column(String(255))
     quantity: Mapped[int] = mapped_column(Integer, default=1)

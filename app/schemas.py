@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ItemStatus
 
@@ -104,8 +104,7 @@ class StockAdjust(BaseModel):
 
 class AssignmentCreate(BaseModel):
     item_id: int
-    assignee_name: str = Field(min_length=1, max_length=100)
-    assignee_email: EmailStr | None = None
+    user_id: int = Field(description="User ID in the Laravel users API")
     quantity: int = Field(default=1, ge=1)
     notes: str | None = None
 
@@ -113,6 +112,7 @@ class AssignmentCreate(BaseModel):
 class AssignmentRead(ORMModel):
     id: int
     item_id: int
+    user_id: int
     assignee_name: str
     assignee_email: str | None
     quantity: int

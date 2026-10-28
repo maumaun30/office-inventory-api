@@ -47,19 +47,18 @@ def test_item_filters(client):
 def test_assignment_lifecycle(client):
     item = make_item(client, quantity=2)
 
-    a1 = client.post(
-        "/assignments",
-        json={"item_id": item["id"], "assignee_name": "Ana", "assignee_email": "ana@example.com"},
-    )
+    a1 = client.post("/assignments", json={"item_id": item["id"], "user_id": 1})
     assert a1.status_code == 201
-    client.post("/assignments", json={"item_id": item["id"], "assignee_name": "Ben"})
+    assert a1.json()["assignee_name"] == "Ana"
+    assert a1.json()["assignee_email"] == "ana@example.com"
+    client.post("/assignments", json={"item_id": item["id"], "user_id": 2})
 
     fetched = client.get(f"/items/{item['id']}").json()
     assert fetched["assigned_quantity"] == 2
     assert fetched["available_quantity"] == 0
 
     # Nothing left
-    over = client.post("/assignments", json={"item_id": item["id"], "assignee_name": "Cy"})
+    over = client.post("/assignments", json={"item_id": item["id"], "user_id": 3})
     assert over.status_code == 409
 
     # Can't shrink stock below what's assigned, or delete
@@ -78,7 +77,7 @@ def test_assignment_lifecycle(client):
 
 def test_cannot_assign_inactive_item(client):
     item = make_item(client, status="in_repair")
-    resp = client.post("/assignments", json={"item_id": item["id"], "assignee_name": "Ana"})
+    resp = client.post("/assignments", json={"item_id": item["id"], "user_id": 1})
     assert resp.status_code == 409
 
 
@@ -91,7 +90,7 @@ def test_stock_adjust(client):
 def test_summary(client):
     make_item(client, quantity=2, unit_cost=100)
     stapler = make_item(client, name="Stapler", quantity=1, reorder_level=1, unit_cost=5.5)
-    client.post("/assignments", json={"item_id": stapler["id"], "assignee_name": "Ana"})
+    client.post("/assignments", json={"item_id": stapler["id"], "user_id": 1})
 
     s = client.get("/items/summary").json()
     assert s["total_items"] == 2
