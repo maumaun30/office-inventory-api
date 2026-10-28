@@ -148,3 +148,20 @@ class InventorySummary(BaseModel):
     total_value: float
     low_stock_items: int
     by_status: dict[str, int]
+
+
+# --- CSV import ---
+
+
+class ImportRowError(BaseModel):
+    row: int = Field(description="Line number in the file (header is line 1)")
+    errors: list[str]
+
+
+class ImportResult(BaseModel):
+    dry_run: bool
+    created: int
+    updated: int
+    unchanged: int
+    created_categories: list[str]
+    created_locations: list[str]

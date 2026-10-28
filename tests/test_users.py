@@ -71,3 +71,27 @@ def test_service_token_from_file(tmp_path, monkeypatch):
             uc.get_users_client()
     finally:
         uc.get_users_client.cache_clear()
+
+
+def test_list_users_pagination_headers(client):
+    first = client.get("/users", params={"per_page": 2})
+    assert [u["id"] for u in first.json()] == [1, 2]
+    assert first.headers["X-Page"] == "1"
+    assert first.headers["X-Per-Page"] == "2"
+    assert first.headers["X-Total-Count"] == "3"
+    assert first.headers["X-Last-Page"] == "2"
+    assert first.headers["Link"] == '<http://testserver/users?per_page=2&page=2>; rel="next"'
+
+    second = client.get("/users", params={"per_page": 2, "page": 2})
+    assert [u["id"] for u in second.json()] == [3]
+    assert second.headers["Link"] == '<http://testserver/users?per_page=2&page=1>; rel="prev"'
+
+    assert client.get("/users", params={"per_page": 101}).status_code == 422
+
+
+def test_list_users_without_meta(client, laravel):
+    laravel.paginated = False
+    resp = client.get("/users")
+    assert [u["id"] for u in resp.json()] == [1, 2, 3]
+    assert "X-Total-Count" not in resp.headers
+    assert "Link" not in resp.headers

@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth import token_cache
 from app.database import Base, get_db
-from app.deps import users_client
+from app.deps import optional_users_client, users_client
 from app.main import app
 from app.users_client import UsersClient
 
@@ -48,6 +48,7 @@ class FakeLaravel:
 
     def __init__(self):
         self.down = False
+        self.paginated = True  # False: /api/users returns no meta block
         self.requests: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -60,8 +61,24 @@ class FakeLaravel:
             if user is None:
                 return httpx.Response(401, json={"message": "Unauthenticated."})
             return httpx.Response(200, json=user)
+        if request.url.path == "/up":
+            return httpx.Response(200, text="OK")
         if request.url.path == "/api/users":
-            return httpx.Response(200, json={"data": list(FAKE_USERS.values()), "meta": {}})
+            # Mimic Laravel's LengthAwarePaginator response.
+            page = int(request.url.params.get("page", 1))
+            per_page = int(request.url.params.get("per_page", 50))
+            users = list(FAKE_USERS.values())
+            last_page = max(1, -(-len(users) // per_page))
+            chunk = users[(page - 1) * per_page : page * per_page]
+            meta = {
+                "current_page": page,
+                "per_page": per_page,
+                "total": len(users),
+                "last_page": last_page,
+            }
+            if not self.paginated:
+                return httpx.Response(200, json={"data": users})
+            return httpx.Response(200, json={"data": chunk, "links": {}, "meta": meta})
         if m := re.fullmatch(r"/api/users/(\d+)", request.url.path):
             user = FAKE_USERS.get(int(m[1]))
             if user is None:
@@ -102,6 +119,7 @@ def client(laravel, engine):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[users_client] = lambda: fake_users
+    app.dependency_overrides[optional_users_client] = lambda: fake_users
     token_cache.clear()
     with TestClient(app, headers=ADMIN) as c:
         yield c

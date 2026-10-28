@@ -20,6 +20,15 @@ def users_client() -> UsersClient:
 
 Users = Annotated[UsersClient, Depends(users_client)]
 
+
+def optional_users_client() -> UsersClient | None:
+    """Like `users_client`, but None instead of 503 when not configured."""
+    try:
+        return get_users_client()
+    except UsersServiceError:
+        return None
+
+
 M = TypeVar("M", bound=Base)
 
 
