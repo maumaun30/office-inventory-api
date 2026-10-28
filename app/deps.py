@@ -51,4 +51,6 @@ def commit_or_409(db: Session) -> None:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Resource conflicts with an existing record") from exc
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Resource conflicts with an existing record"
+        ) from exc

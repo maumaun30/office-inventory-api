@@ -30,7 +30,8 @@ def _ensure_covers_assigned(item: Item, new_quantity: int) -> None:
     if new_quantity < item.assigned_quantity:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"Quantity {new_quantity} is below the {item.assigned_quantity} units currently assigned",
+            f"Quantity {new_quantity} is below the {item.assigned_quantity} "
+            "units currently assigned",
         )
 
 
@@ -65,7 +66,9 @@ def list_items(
     if q:
         pattern = f"%{q}%"
         stmt = stmt.where(
-            or_(Item.name.ilike(pattern), Item.sku.ilike(pattern), Item.serial_number.ilike(pattern))
+            or_(
+                Item.name.ilike(pattern), Item.sku.ilike(pattern), Item.serial_number.ilike(pattern)
+            )
         )
     if category_id is not None:
         stmt = stmt.where(Item.category_id == category_id)

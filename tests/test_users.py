@@ -25,13 +25,17 @@ def test_assign_unknown_user_rejected(client):
 def test_laravel_down_returns_503(client, laravel):
     item = make_item(client)
     laravel.down = True
-    assert client.post("/assignments", json={"item_id": item["id"], "user_id": 1}).status_code == 503
+    assert (
+        client.post("/assignments", json={"item_id": item["id"], "user_id": 1}).status_code == 503
+    )
     assert client.get("/users").status_code == 503
 
 
 def test_local_checks_skip_laravel_call(client, laravel):
     item = make_item(client, status="retired")
-    assert client.post("/assignments", json={"item_id": item["id"], "user_id": 1}).status_code == 409
+    assert (
+        client.post("/assignments", json={"item_id": item["id"], "user_id": 1}).status_code == 409
+    )
     assert [r.url.path for r in laravel.requests] == ["/api/user"]  # auth only, then cached
 
 

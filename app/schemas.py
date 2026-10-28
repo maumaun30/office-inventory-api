@@ -11,6 +11,7 @@ class ORMModel(BaseModel):
 
 # --- Categories ---
 
+
 class CategoryBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str | None = None
@@ -30,6 +31,7 @@ class CategoryRead(CategoryBase, ORMModel):
 
 
 # --- Locations ---
+
 
 class LocationBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -54,6 +56,7 @@ class LocationRead(LocationBase, ORMModel):
 
 
 # --- Items ---
+
 
 class ItemBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -102,6 +105,7 @@ class StockAdjust(BaseModel):
 
 # --- Assignments ---
 
+
 class AssignmentCreate(BaseModel):
     item_id: int
     user_id: int = Field(description="User ID in the Laravel users API")
@@ -135,6 +139,7 @@ class StockMovementRead(ORMModel):
 
 
 # --- Stats ---
+
 
 class InventorySummary(BaseModel):
     total_items: int
