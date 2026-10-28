@@ -118,6 +118,12 @@ Audit: every quantity change writes a stock movement; assignments record `assign
 .venv/bin/pytest
 ```
 
+Lint and format (also run in CI):
+
+```bash
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
+```
+
 Runs on in-memory SQLite by default. To also run the Postgres-only concurrency test, point it at an empty scratch database (it is wiped by each test):
 
 ```bash

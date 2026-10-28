@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func, select
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
@@ -8,7 +8,7 @@ from app.database import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ItemStatus(str, enum.Enum):
@@ -97,7 +97,9 @@ class Item(Base):
     reorder_level: Mapped[int] = mapped_column(Integer, default=0)
     unit_cost: Mapped[float | None]
     status: Mapped[ItemStatus] = mapped_column(Enum(ItemStatus), default=ItemStatus.active)
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL")
+    )
     location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

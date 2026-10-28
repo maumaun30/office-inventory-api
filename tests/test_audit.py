@@ -94,7 +94,9 @@ def test_concurrent_assignments_cannot_over_assign(client, monkeypatch):
         # Own client per thread so requests really run in parallel.
         with TestClient(app, headers=ADMIN) as c:
             barrier.wait()
-            codes.append(c.post("/assignments", json={"item_id": item["id"], "user_id": 2}).status_code)
+            codes.append(
+                c.post("/assignments", json={"item_id": item["id"], "user_id": 2}).status_code
+            )
 
     threads = [threading.Thread(target=worker) for _ in range(n)]
     for t in threads:

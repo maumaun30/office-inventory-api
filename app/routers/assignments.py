@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -86,7 +86,7 @@ def return_assignment(assignment_id: int, db: DB, admin: Admin):
     assignment = get_for_update(db, Assignment, assignment_id)
     if assignment.returned_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Assignment already returned")
-    assignment.returned_at = datetime.now(timezone.utc)
+    assignment.returned_at = datetime.now(UTC)
     assignment.returned_by_user_id = admin.id
     db.commit()
     return assignment

@@ -7,7 +7,9 @@ from app.users_client import UsersServiceError
 # Schema is managed by Alembic: run `alembic upgrade head` before starting.
 app = FastAPI(
     title="Office Inventory API",
-    description="Track office equipment and supplies: items, categories, locations, and who has what.",
+    description=(
+        "Track office equipment and supplies: items, categories, locations, and who has what."
+    ),
     version="1.0.0",
 )
 

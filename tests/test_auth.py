@@ -41,8 +41,13 @@ def test_staff_can_read_but_not_write(client):
     assert client.get("/categories", headers=STAFF).status_code == 200
 
     assert client.post("/items", json={"name": "X"}, headers=STAFF).status_code == 403
-    assert client.patch(f"/items/{item['id']}", json={"name": "Y"}, headers=STAFF).status_code == 403
-    assert client.post(f"/items/{item['id']}/adjust", json={"delta": 1}, headers=STAFF).status_code == 403
+    assert (
+        client.patch(f"/items/{item['id']}", json={"name": "Y"}, headers=STAFF).status_code == 403
+    )
+    assert (
+        client.post(f"/items/{item['id']}/adjust", json={"delta": 1}, headers=STAFF).status_code
+        == 403
+    )
     assert client.delete(f"/items/{item['id']}", headers=STAFF).status_code == 403
     assert client.post("/categories", json={"name": "C"}, headers=STAFF).status_code == 403
     assert client.post("/locations", json={"name": "L"}, headers=STAFF).status_code == 403
@@ -82,7 +87,9 @@ def test_laravel_down_on_first_auth_503(client, laravel):
 def test_admin_field_configurable(client, laravel, monkeypatch):
     monkeypatch.setitem(TOKENS, "flag-token", {"id": 3, "name": "Cy", "is_admin": True})
     monkeypatch.setattr(auth, "get_auth_settings", lambda: AuthSettings(admin_field="is_admin"))
-    resp = client.post("/categories", json={"name": "C"}, headers={"Authorization": "Bearer flag-token"})
+    resp = client.post(
+        "/categories", json={"name": "C"}, headers={"Authorization": "Bearer flag-token"}
+    )
     assert resp.status_code == 201
 
 

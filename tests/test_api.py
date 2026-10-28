@@ -16,9 +16,10 @@ def test_category_crud_and_conflict(client):
     cat_id = resp.json()["id"]
 
     assert client.post("/categories", json={"name": "Electronics"}).status_code == 409
-    assert client.patch(f"/categories/{cat_id}", json={"description": "Gadgets"}).json()[
-        "description"
-    ] == "Gadgets"
+    assert (
+        client.patch(f"/categories/{cat_id}", json={"description": "Gadgets"}).json()["description"]
+        == "Gadgets"
+    )
     assert client.delete(f"/categories/{cat_id}").status_code == 204
     assert client.get(f"/categories/{cat_id}").status_code == 404
 
@@ -38,7 +39,9 @@ def test_item_filters(client):
     make_item(client, name="Stapler", quantity=1, reorder_level=2, status="active")
     make_item(client, name="Old Printer", status="retired")
 
-    names = lambda r: [i["name"] for i in r.json()]
+    def names(resp):
+        return [i["name"] for i in resp.json()]
+
     assert names(client.get("/items", params={"q": "mon"})) == ["Monitor"]
     assert names(client.get("/items", params={"status": "retired"})) == ["Old Printer"]
     assert names(client.get("/items", params={"low_stock": True})) == ["Stapler"]
